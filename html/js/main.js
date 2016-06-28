@@ -18,7 +18,7 @@ $(document).ready(function(){
 					html += '<ul class="children collapse' + (key ? '' : ' in') + '" id="sub-item-' + key + '">';
 					for (var i = 1; i < count; i++) {
 						if (vals[i]) {
-							html += '<li><a href="javascript:log_list(\'' + vals[i] + '\');"><span class="glyphicon glyphicon-share-alt"></span> ' + vals[i] + '</a></li>';
+							html += '<li><a href="javascript:log_list(\'' + vals[0] + '\',\'' + vals[i] + '\');"><span class="glyphicon glyphicon-share-alt"></span> ' + vals[i] + '</a></li>';
 						}
 					}
 					html += '</ul></li>';
@@ -54,7 +54,15 @@ $("#pagenum").change(function(){
 	log_info();
 });
 
-function log_info(logname){
+function log_info(hostname, logname){
+	if (hostname) {
+		$("#hostname").text(hostname);
+	} else {
+		hostname = $("#hostname").text();
+	}
+	var hostarr = hostname.split(":");
+	var curhost = window.location.host.split(":")[0];
+	var hosturl = hostarr[0] == curhost ? '' : '&loghost='+hostarr[0]+'&logport='+hostarr[1];
 	if (logname) {
 		$("#logname").val(logname);
 	} else {
@@ -64,14 +72,14 @@ function log_info(logname){
 	var pagenum = $("#pagenum").val();
 	pagenum = !pagenum ? 1 : pagenum;
 	$.ajax({   
-		url:'/?action=loginfo&logname='+logname+'&logreg='+logreg+'&pagenum='+pagenum,   
+		url:'/?action=loginfo'+hosturl+'&logname='+logname+'&logreg='+logreg+'&pagenum='+pagenum,   
 		type:'get',
 		data:'',
 		error:function(){   
 			alert('Get Log Info Error!');   
 		},   
 		success:function(data){
-			show_nav(logname);
+			show_nav(hostname, logname);
 			$(".panel .panel-heading").show(); 
 			var arr = data.split("\n");
 			var html = "";
@@ -93,28 +101,36 @@ function log_info(logname){
 	});
 }
 
-function log_list(dirname){
+function log_list(hostname, dirname){
+	if (hostname) {
+		$("#hostname").text(hostname);
+	} else {
+		hostname = $("#hostname").text();
+	}
+	var hostarr = hostname.split(":");
+	var curhost = window.location.host.split(":")[0];
+	var hosturl = hostarr[0] == curhost ? '' : '&loghost='+hostarr[0]+'&logport='+hostarr[1];
 	if (!dirname){
 		alert('Get Log List Error!');  
 	}
 	$.ajax({   
-		url:'/?action=loglist&dirname='+dirname,   
+		url:'/?action=loglist'+hosturl+'&dirname='+dirname,   
 		type:'get',
 		data:'',
 		error:function(){   
 			alert('Get Log List Error!');   
 		},   
 		success:function(data){
-			show_nav(dirname);
+			show_nav(hostname, dirname);
 			$(".panel .panel-heading").hide(); 
 			var arr = data.split("\n");
 			var html = "";
 			$.each(arr, function(key, val){
 				if (key) {
 					if (val.indexOf('/') > -1) {
-						html += "<a href=\"javascript:log_list('" + dirname + val + "');\"><b>" + val + "</b></a></br>";
+						html += "<a href=\"javascript:log_list('" + hostname + "','" + dirname + val + "');\"><b>" + val + "</b></a></br>";
 					} else {
-						html += "<a href=\"javascript:log_info('" + dirname + val + "');\">" + val + "</a></br>";
+						html += "<a href=\"javascript:log_info('" + hostname + "','" + dirname + val + "');\">" + val + "</a></br>";
 					}
 				}
 			});
@@ -123,7 +139,7 @@ function log_list(dirname){
 	});
 }
 
-function show_nav(logname){
+function show_nav(hostname, logname){
 	if (!logname) {
 		alert('Show Log Nav Error!');  
 	}
@@ -134,10 +150,11 @@ function show_nav(logname){
 		arr.splice(total - 1, 1);
 		var dirname = "/";
 		var breadcrumb = '<li><a href="/"><span class="glyphicon glyphicon-home"></span></a></li>';
+		breadcrumb += '<li id="hostname">' + hostname + '</li>';
 		$.each(arr, function(key, val) {
 			if (key) {
 				dirname += val + "/";
-				breadcrumb += '<li class="active"><a href="javascript:log_list(\'' + dirname + '\');">' + val + '</a></li>';
+				breadcrumb += '<li class="active"><a href="javascript:log_list(\'' + hostname + '\',\'' + dirname + '\');">' + val + '</a></li>';
 			}
 		});
 		$(".breadcrumb").html(breadcrumb);
@@ -146,10 +163,11 @@ function show_nav(logname){
 		arr.splice(total - 2, 2);
 		var dirname = "/";
 		var breadcrumb = '<li><a href="/"><span class="glyphicon glyphicon-home"></span></a></li>';
+		breadcrumb += '<li id="hostname">' + hostname + '</li>';
 		$.each(arr, function(key, val) {
 			if (key) {
 				dirname += val + "/";
-				breadcrumb += '<li class="active"><a href="javascript:log_list(\'' + dirname + '\');">' + val + '</a></li>';
+				breadcrumb += '<li class="active"><a href="javascript:log_list(\'' + hostname + '\',\'' + dirname + '\');">' + val + '</a></li>';
 			}
 		});
 		$(".breadcrumb").html(breadcrumb);

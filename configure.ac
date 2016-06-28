@@ -108,6 +108,8 @@ AC_CHECK_HEADERS([fcntl.h])
 AC_CHECK_HEADERS([stdlib.h])
 AC_CHECK_HEADERS([string.h])
 AC_CHECK_HEADERS([unistd.h])
+AC_CHECK_HEADERS([netinet/in.h])
+AC_CHECK_HEADERS([sys/socket.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 
@@ -116,8 +118,11 @@ AC_CHECK_FUNCS([getcwd])
 AC_CHECK_FUNCS([memset])
 AC_CHECK_FUNCS([strdup])
 AC_CHECK_FUNCS([strrchr])
+AC_CHECK_FUNCS([bzero])
+AC_CHECK_FUNCS([socket])
 
 AC_FUNC_FORK
+AC_FUNC_MALLOC
 AC_TYPE_PID_T
 
 AC_CONFIG_FILES([Makefile])

@@ -54,6 +54,7 @@ void show_help() {
 		"-l <ip_addr> interface to listen on, default is 127.0.0.1\n"
 		"-p <num>     port number to listen on, default is 8706\n"
 		"-d           run as a deamon\n"
+		"-s           run as a socket server\n"
 		"-t <second>  timeout for a http request, default is 60 seconds\n"
 		"-h           print this help and exit\n"
 		"\n";

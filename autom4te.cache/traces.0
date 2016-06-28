@@ -241,62 +241,93 @@ m4trace:configure.ac:109: -1- AH_OUTPUT([HAVE_STRING_H], [/* Define to 1 if you 
 m4trace:configure.ac:110: -1- AC_CHECK_HEADERS([unistd.h])
 m4trace:configure.ac:110: -1- AH_OUTPUT([HAVE_UNISTD_H], [/* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H])
-m4trace:configure.ac:115: -1- AC_CHECK_FUNCS([getcwd])
-m4trace:configure.ac:115: -1- AH_OUTPUT([HAVE_GETCWD], [/* Define to 1 if you have the `getcwd\' function. */
+m4trace:configure.ac:111: -1- AC_CHECK_HEADERS([netinet/in.h])
+m4trace:configure.ac:111: -1- AH_OUTPUT([HAVE_NETINET_IN_H], [/* Define to 1 if you have the <netinet/in.h> header file. */
+#undef HAVE_NETINET_IN_H])
+m4trace:configure.ac:112: -1- AC_CHECK_HEADERS([sys/socket.h])
+m4trace:configure.ac:112: -1- AH_OUTPUT([HAVE_SYS_SOCKET_H], [/* Define to 1 if you have the <sys/socket.h> header file. */
+#undef HAVE_SYS_SOCKET_H])
+m4trace:configure.ac:117: -1- AC_CHECK_FUNCS([getcwd])
+m4trace:configure.ac:117: -1- AH_OUTPUT([HAVE_GETCWD], [/* Define to 1 if you have the `getcwd\' function. */
 #undef HAVE_GETCWD])
-m4trace:configure.ac:116: -1- AC_CHECK_FUNCS([memset])
-m4trace:configure.ac:116: -1- AH_OUTPUT([HAVE_MEMSET], [/* Define to 1 if you have the `memset\' function. */
+m4trace:configure.ac:118: -1- AC_CHECK_FUNCS([memset])
+m4trace:configure.ac:118: -1- AH_OUTPUT([HAVE_MEMSET], [/* Define to 1 if you have the `memset\' function. */
 #undef HAVE_MEMSET])
-m4trace:configure.ac:117: -1- AC_CHECK_FUNCS([strdup])
-m4trace:configure.ac:117: -1- AH_OUTPUT([HAVE_STRDUP], [/* Define to 1 if you have the `strdup\' function. */
+m4trace:configure.ac:119: -1- AC_CHECK_FUNCS([strdup])
+m4trace:configure.ac:119: -1- AH_OUTPUT([HAVE_STRDUP], [/* Define to 1 if you have the `strdup\' function. */
 #undef HAVE_STRDUP])
-m4trace:configure.ac:118: -1- AC_CHECK_FUNCS([strrchr])
-m4trace:configure.ac:118: -1- AH_OUTPUT([HAVE_STRRCHR], [/* Define to 1 if you have the `strrchr\' function. */
+m4trace:configure.ac:120: -1- AC_CHECK_FUNCS([strrchr])
+m4trace:configure.ac:120: -1- AH_OUTPUT([HAVE_STRRCHR], [/* Define to 1 if you have the `strrchr\' function. */
 #undef HAVE_STRRCHR])
-m4trace:configure.ac:120: -1- AC_FUNC_FORK
-m4trace:configure.ac:120: -1- AC_TYPE_PID_T
-m4trace:configure.ac:120: -1- AC_DEFINE_TRACE_LITERAL([pid_t])
-m4trace:configure.ac:120: -1- m4_pattern_allow([^pid_t$])
-m4trace:configure.ac:120: -1- AH_OUTPUT([pid_t], [/* Define to `int\' if <sys/types.h> does not define. */
+m4trace:configure.ac:121: -1- AC_CHECK_FUNCS([bzero])
+m4trace:configure.ac:121: -1- AH_OUTPUT([HAVE_BZERO], [/* Define to 1 if you have the `bzero\' function. */
+#undef HAVE_BZERO])
+m4trace:configure.ac:122: -1- AC_CHECK_FUNCS([socket])
+m4trace:configure.ac:122: -1- AH_OUTPUT([HAVE_SOCKET], [/* Define to 1 if you have the `socket\' function. */
+#undef HAVE_SOCKET])
+m4trace:configure.ac:124: -1- AC_FUNC_FORK
+m4trace:configure.ac:124: -1- AC_TYPE_PID_T
+m4trace:configure.ac:124: -1- AC_DEFINE_TRACE_LITERAL([pid_t])
+m4trace:configure.ac:124: -1- m4_pattern_allow([^pid_t$])
+m4trace:configure.ac:124: -1- AH_OUTPUT([pid_t], [/* Define to `int\' if <sys/types.h> does not define. */
 #undef pid_t])
-m4trace:configure.ac:120: -1- AC_CHECK_HEADERS([vfork.h])
-m4trace:configure.ac:120: -1- AH_OUTPUT([HAVE_VFORK_H], [/* Define to 1 if you have the <vfork.h> header file. */
+m4trace:configure.ac:124: -1- AC_CHECK_HEADERS([vfork.h])
+m4trace:configure.ac:124: -1- AH_OUTPUT([HAVE_VFORK_H], [/* Define to 1 if you have the <vfork.h> header file. */
 #undef HAVE_VFORK_H])
-m4trace:configure.ac:120: -1- AC_CHECK_FUNCS([fork vfork])
-m4trace:configure.ac:120: -1- AH_OUTPUT([HAVE_FORK], [/* Define to 1 if you have the `fork\' function. */
+m4trace:configure.ac:124: -1- AC_CHECK_FUNCS([fork vfork])
+m4trace:configure.ac:124: -1- AH_OUTPUT([HAVE_FORK], [/* Define to 1 if you have the `fork\' function. */
 #undef HAVE_FORK])
-m4trace:configure.ac:120: -1- AH_OUTPUT([HAVE_VFORK], [/* Define to 1 if you have the `vfork\' function. */
+m4trace:configure.ac:124: -1- AH_OUTPUT([HAVE_VFORK], [/* Define to 1 if you have the `vfork\' function. */
 #undef HAVE_VFORK])
-m4trace:configure.ac:120: -1- AC_DEFINE_TRACE_LITERAL([HAVE_WORKING_VFORK])
-m4trace:configure.ac:120: -1- m4_pattern_allow([^HAVE_WORKING_VFORK$])
-m4trace:configure.ac:120: -1- AH_OUTPUT([HAVE_WORKING_VFORK], [/* Define to 1 if `vfork\' works. */
+m4trace:configure.ac:124: -1- AC_DEFINE_TRACE_LITERAL([HAVE_WORKING_VFORK])
+m4trace:configure.ac:124: -1- m4_pattern_allow([^HAVE_WORKING_VFORK$])
+m4trace:configure.ac:124: -1- AH_OUTPUT([HAVE_WORKING_VFORK], [/* Define to 1 if `vfork\' works. */
 #undef HAVE_WORKING_VFORK])
-m4trace:configure.ac:120: -1- AC_DEFINE_TRACE_LITERAL([vfork])
-m4trace:configure.ac:120: -1- m4_pattern_allow([^vfork$])
-m4trace:configure.ac:120: -1- AH_OUTPUT([vfork], [/* Define as `fork\' if `vfork\' does not work. */
+m4trace:configure.ac:124: -1- AC_DEFINE_TRACE_LITERAL([vfork])
+m4trace:configure.ac:124: -1- m4_pattern_allow([^vfork$])
+m4trace:configure.ac:124: -1- AH_OUTPUT([vfork], [/* Define as `fork\' if `vfork\' does not work. */
 #undef vfork])
-m4trace:configure.ac:120: -1- AC_DEFINE_TRACE_LITERAL([HAVE_WORKING_FORK])
-m4trace:configure.ac:120: -1- m4_pattern_allow([^HAVE_WORKING_FORK$])
-m4trace:configure.ac:120: -1- AH_OUTPUT([HAVE_WORKING_FORK], [/* Define to 1 if `fork\' works. */
+m4trace:configure.ac:124: -1- AC_DEFINE_TRACE_LITERAL([HAVE_WORKING_FORK])
+m4trace:configure.ac:124: -1- m4_pattern_allow([^HAVE_WORKING_FORK$])
+m4trace:configure.ac:124: -1- AH_OUTPUT([HAVE_WORKING_FORK], [/* Define to 1 if `fork\' works. */
 #undef HAVE_WORKING_FORK])
-m4trace:configure.ac:121: -1- AC_TYPE_PID_T
-m4trace:configure.ac:121: -1- AC_DEFINE_TRACE_LITERAL([pid_t])
-m4trace:configure.ac:121: -1- m4_pattern_allow([^pid_t$])
-m4trace:configure.ac:121: -1- AH_OUTPUT([pid_t], [/* Define to `int\' if <sys/types.h> does not define. */
+m4trace:configure.ac:125: -1- AC_FUNC_MALLOC
+m4trace:configure.ac:125: -1- AC_CHECK_HEADERS([stdlib.h])
+m4trace:configure.ac:125: -1- AH_OUTPUT([HAVE_STDLIB_H], [/* Define to 1 if you have the <stdlib.h> header file. */
+#undef HAVE_STDLIB_H])
+m4trace:configure.ac:125: -1- AC_DEFINE_TRACE_LITERAL([HAVE_MALLOC])
+m4trace:configure.ac:125: -1- m4_pattern_allow([^HAVE_MALLOC$])
+m4trace:configure.ac:125: -1- AH_OUTPUT([HAVE_MALLOC], [/* Define to 1 if your system has a GNU libc compatible `malloc\' function, and
+   to 0 otherwise. */
+#undef HAVE_MALLOC])
+m4trace:configure.ac:125: -1- AC_DEFINE_TRACE_LITERAL([HAVE_MALLOC])
+m4trace:configure.ac:125: -1- m4_pattern_allow([^HAVE_MALLOC$])
+m4trace:configure.ac:125: -1- AC_LIBSOURCE([malloc.c])
+m4trace:configure.ac:125: -1- AC_SUBST([LIB@&t@OBJS], ["$LIB@&t@OBJS malloc.$ac_objext"])
+m4trace:configure.ac:125: -1- AC_SUBST_TRACE([LIB@&t@OBJS])
+m4trace:configure.ac:125: -1- m4_pattern_allow([^LIB@&t@OBJS$])
+m4trace:configure.ac:125: -1- AC_DEFINE_TRACE_LITERAL([malloc])
+m4trace:configure.ac:125: -1- m4_pattern_allow([^malloc$])
+m4trace:configure.ac:125: -1- AH_OUTPUT([malloc], [/* Define to rpl_malloc if the replacement function should be used. */
+#undef malloc])
+m4trace:configure.ac:126: -1- AC_TYPE_PID_T
+m4trace:configure.ac:126: -1- AC_DEFINE_TRACE_LITERAL([pid_t])
+m4trace:configure.ac:126: -1- m4_pattern_allow([^pid_t$])
+m4trace:configure.ac:126: -1- AH_OUTPUT([pid_t], [/* Define to `int\' if <sys/types.h> does not define. */
 #undef pid_t])
-m4trace:configure.ac:123: -1- AC_CONFIG_FILES([Makefile])
-m4trace:configure.ac:124: -1- AC_SUBST([LIB@&t@OBJS], [$ac_libobjs])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([LIB@&t@OBJS])
-m4trace:configure.ac:124: -1- m4_pattern_allow([^LIB@&t@OBJS$])
-m4trace:configure.ac:124: -1- AC_SUBST([LTLIBOBJS], [$ac_ltlibobjs])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([LTLIBOBJS])
-m4trace:configure.ac:124: -1- m4_pattern_allow([^LTLIBOBJS$])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([top_builddir])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([top_build_prefix])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([srcdir])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([abs_srcdir])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([top_srcdir])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([abs_top_srcdir])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([builddir])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([abs_builddir])
-m4trace:configure.ac:124: -1- AC_SUBST_TRACE([abs_top_builddir])
+m4trace:configure.ac:128: -1- AC_CONFIG_FILES([Makefile])
+m4trace:configure.ac:129: -1- AC_SUBST([LIB@&t@OBJS], [$ac_libobjs])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([LIB@&t@OBJS])
+m4trace:configure.ac:129: -1- m4_pattern_allow([^LIB@&t@OBJS$])
+m4trace:configure.ac:129: -1- AC_SUBST([LTLIBOBJS], [$ac_ltlibobjs])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([LTLIBOBJS])
+m4trace:configure.ac:129: -1- m4_pattern_allow([^LTLIBOBJS$])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([top_builddir])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([top_build_prefix])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([srcdir])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([abs_srcdir])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([top_srcdir])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([abs_top_srcdir])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([builddir])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([abs_builddir])
+m4trace:configure.ac:129: -1- AC_SUBST_TRACE([abs_top_builddir])

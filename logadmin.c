@@ -21,6 +21,9 @@
 #include <sys/queue.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <dirent.h>  
 #include <unistd.h>  
 #include <fcntl.h>
@@ -43,6 +46,24 @@ struct http_req
     char request_time[2000];
 } http_req_line;
 
+struct sock_ev {
+    struct event* read_ev;
+    struct event* write_ev;
+    char* buffer;
+};
+
+/** 
+ *  set_nonblock - set nonblock 
+ */
+int set_nonblock(int fd)
+{
+  int flags;
+
+  flags = fcntl(fd, F_GETFL);
+  flags |= O_NONBLOCK;
+  fcntl(fd, F_SETFL, flags);
+}
+
 /** 
  *  file_size - get file size 
  */
@@ -54,6 +75,68 @@ long file_size(const char *filename)
         return buf.st_size;
     }  
     return 0;
+}
+
+/** 
+ *  sock_cmd - execute shell command by socket
+ */ 
+void sock_cmd(char *host, int port, char *cmd, char *buf, int len)
+{
+	if (!host || !strlen(host)) {
+        return;
+    }
+    if (port <= 0) {
+        port = 8706;
+	}
+	if (!cmd || !strlen(cmd)) {
+        return;
+    }
+    if (len <= 0) {
+        len = 2048;
+	}
+
+    // create socket
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to create socket\n");
+		return;
+	}
+
+    // connect socket
+    struct sockaddr_in my_address;
+    memset(&my_address, 0, sizeof(my_address));
+    my_address.sin_family = AF_INET;
+    my_address.sin_addr.s_addr = inet_addr(host);
+    my_address.sin_port = htons(port);
+    if (connect(fd, (struct sockaddr*)&my_address, sizeof(my_address)) == -1) {  
+		fprintf(stderr, "Failed to connect socket %s:%d\n", host, port);
+		return;
+    }
+
+    // set socket timeout
+	int timeout = 2000; // 2 second timeout
+	setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(int));
+	setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(int));
+
+    // send socket
+	if (send(fd, cmd, strlen(cmd), 0) < 0) {  
+		fprintf(stderr, "Failed to write socket\n");
+		return;
+	}
+
+    // recv socket
+	memset(buf, 0, len);
+	while (1) {
+		if (recv(fd, buf, len, 0) < 0) {
+			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) continue;//继续接收数据
+			fprintf(stderr, "Failed to read socket\n");
+			break;//跳出接收循环
+		} else {
+			break;//跳出接收循环
+		}
+	}
+
+    close(fd);
 }
 
 /** 
@@ -81,7 +164,6 @@ void http_handler(struct evhttp_request *req, void *arg)
     char real_path[20000];
     char tmp[200000];
     char content_type[2000];
-    int fd;
   
     time_t timep;
     struct tm *m;
@@ -117,9 +199,12 @@ void http_handler(struct evhttp_request *req, void *arg)
 	if (action) {
 		evhttp_add_header(req->output_headers, "Content-Type", "text/html; charset=UTF-8");
 		if (strcmp(action, "loginfo") == 0) {
+			char *loghost = (char*)evhttp_find_header(&params, "loghost");
+			char *logport = (char*)evhttp_find_header(&params, "logport");
 			char *logname = (char*)evhttp_find_header(&params, "logname");
 			char *pagenum = (char*)evhttp_find_header(&params, "pagenum");
 			int pnum = pagenum ? atoi(pagenum) : 1;
+			int port = logport ? atoi(logport) : 8706;
 			memset(&tmp, 0, sizeof(tmp));
 			if (logname) {
 				char cmd[2000];
@@ -128,18 +213,31 @@ void http_handler(struct evhttp_request *req, void *arg)
 				if(!logreg || !strlen(logreg)){
 					logreg = ".*";
 				}
+				memset(&cmd, 0, sizeof(cmd));
 				sprintf(cmd, "grep '%s' %s -c && grep '%s' %s | tail -n +%d | head -n %d", logreg, logname, logreg, logname, (pnum - 1) * psize, psize);
-				exec_cmd(cmd, &tmp, 4096);
+				if (!loghost || !strlen(loghost)) {
+					exec_cmd(cmd, &tmp, MEM_SIZE);
+				} else {
+					sock_cmd(loghost, port, cmd, (char*)&tmp, MEM_SIZE);
+				}
 			}
 			evbuffer_add_printf(buf, "%s", tmp);
 			evhttp_send_reply(req, HTTP_OK, "OK", buf);
 		} else if(strcmp(action, "loglist") == 0) {
+			char *loghost = (char*)evhttp_find_header(&params, "loghost");
+			char *logport = (char*)evhttp_find_header(&params, "logport");
 			char *dirname = (char*)evhttp_find_header(&params, "dirname");
+			int port = logport ? atoi(logport) : 8706;
 			memset(&tmp, 0, sizeof(tmp));
 			if (dirname) {
 				char cmd[2000];
+				memset(&cmd, 0, sizeof(cmd));
 				sprintf(cmd, "ls -lF %s | awk '{print $9}'", dirname);
-				exec_cmd(cmd, &tmp, 4096);
+				if (!loghost || !strlen(loghost)) {
+					exec_cmd(cmd, &tmp, MEM_SIZE);
+				} else {
+					sock_cmd(loghost, port, cmd, (char*)&tmp, MEM_SIZE);
+				}
 			}
 			evbuffer_add_printf(buf, "%s", tmp);
 			evhttp_send_reply(req, HTTP_OK, "OK", buf);
@@ -151,15 +249,20 @@ void http_handler(struct evhttp_request *req, void *arg)
 				int i;
 				gchar* host;
 				gchar* path;
+				gchar* port;
 				gsize length;
 				char conf[20000];
 				gchar** groups = g_key_file_get_groups(config, &length);
 				for (i = 0; i < (int)length; i++) {
 					host = g_key_file_get_string(config, groups[i], "host", NULL);
 					path = g_key_file_get_string(config, groups[i], "path", NULL);
+					port = g_key_file_get_string(config, groups[i], "port", NULL);
+					if(!port || !strlen(port)){
+						port = "8706";
+					}
 					if (host && path) {
 						strcpy(conf, tmp);
-						sprintf(tmp, "%s%s;%s\n", conf, host, path);
+						sprintf(tmp, "%s%s:%s;%s\n", conf, host, port, path);
 					}
 				}
 			}
@@ -179,8 +282,7 @@ void http_handler(struct evhttp_request *req, void *arg)
 	getcwd(dir_root, sizeof(dir_root));
     sprintf(real_path, "%s/%s%s", dir_root, DOCUMENT_ROOT, http_req_line.request_uri);
 
-    if(stat(real_path,&info) == -1)
-    {
+    if (stat(real_path,&info) == -1) {
         evhttp_add_header(req->output_headers, "Content-Type", "text/html; charset=UTF-8");
         if (errno == ENOENT)
         {
@@ -197,11 +299,9 @@ void http_handler(struct evhttp_request *req, void *arg)
 			evbuffer_add_printf(buf, "<html><head><title>500 Server Error</title></head><body><h1 align=\"center\">500 Server Error</h1></body></html>");
 			evhttp_send_reply(req, 500, "Server Error", buf);
         }
-    }  
-    else if(S_ISREG(info.st_mode))
-    {
+    } else if(S_ISREG(info.st_mode)) {
         memset(&tmp, 0, sizeof(tmp));
-        fd = open(real_path, O_RDONLY);
+        int fd = open(real_path, O_RDONLY);
         read(fd, tmp, file_size(real_path));
         close(fd);
   
@@ -216,7 +316,67 @@ void http_handler(struct evhttp_request *req, void *arg)
 
     // 内存释放
     evbuffer_free(buf);
-}  
+}
+
+/** 
+ *  free_sock - free socket
+ */ 
+
+void free_sock(struct sock_ev* ev)
+{
+    event_del(ev->read_ev);
+    free(ev->read_ev);
+    free(ev->write_ev);
+    free(ev->buffer);
+    free(ev);
+}
+
+/** 
+ *  on_write - event write
+ */ 
+void on_write(int sock, short event, void* arg)
+{
+    char* buffer = (char*)arg;
+    send(sock, buffer, strlen(buffer), 0);
+    free(buffer);
+}
+
+/** 
+ *  on_read - event read
+ */ 
+void on_read(int sock, short event, void* arg)
+{
+    struct event* write_ev;
+    struct sock_ev* ev = (struct sock_ev*)arg;
+    ev->buffer = (char*)malloc(MEM_SIZE);
+    bzero(ev->buffer, MEM_SIZE);
+    if (recv(sock, ev->buffer, MEM_SIZE, 0) <= 0) {
+        free_sock(ev);
+        close(sock);
+        return;
+    }
+	char cmd[2000];
+	sprintf(cmd, "%s", ev->buffer);
+	exec_cmd(cmd, ev->buffer, MEM_SIZE);
+    event_set(ev->write_ev, sock, EV_WRITE, on_write, ev->buffer);
+    event_add(ev->write_ev, NULL);
+}
+
+/** 
+ *  on_accept - event accept
+ */ 
+void on_accept(int sock, short event, void* arg)
+{
+    struct sockaddr_in cli_addr;
+    int newfd, sin_size;
+    struct sock_ev* ev = (struct sock_ev*)malloc(sizeof(struct sock_ev));
+    ev->read_ev = (struct event*)malloc(sizeof(struct event));
+    ev->write_ev = (struct event*)malloc(sizeof(struct event));
+    sin_size = sizeof(struct sockaddr_in);
+    newfd = accept(sock, (struct sockaddr*)&cli_addr, &sin_size);
+    event_set(ev->read_ev, newfd, EV_READ|EV_PERSIST, on_read, ev);
+    event_add(ev->read_ev, NULL);
+}
   
 int main(int argc, char **argv)
 {
@@ -227,26 +387,30 @@ int main(int argc, char **argv)
 	signal(SIGQUIT, signal_handler);
 
 	//默认参数
-	char *httpd_option_listen = "127.0.0.1";
-	int httpd_option_port = 8706;
-	int httpd_option_daemon = 0;
-	int httpd_option_timeout = 60;
+	char *event_option_listen = "127.0.0.1";
+	int event_option_port = 8706;
+	int event_option_daemon = 0;
+	int event_option_timeout = 60;
+	int event_option_socket = 0;
 
 	//获取参数
 	int c;
-	while ((c = getopt(argc, argv, "l:p:dt:vh")) != -1) {
+	while ((c = getopt(argc, argv, "l:p:dst:vh")) != -1) {
 		switch (c) {
 			case 'l' :
-				httpd_option_listen = optarg;
+				event_option_listen = optarg;
 				break;
 			case 'p' :
-				httpd_option_port = atoi(optarg);
+				event_option_port = atoi(optarg);
 				break;
 			case 'd' :
-				httpd_option_daemon = 1;
+				event_option_daemon = 1;
+				break;
+			case 's' :
+				event_option_socket = 1;
 				break;
 			case 't' :
-				httpd_option_timeout = atoi(optarg);
+				event_option_timeout = atoi(optarg);
 				break;
 			case 'v' :
 				show_version();
@@ -259,11 +423,11 @@ int main(int argc, char **argv)
 	}
 
 	//判断是否设置了-d，以daemon运行
-	if (httpd_option_daemon) {
+	if (event_option_daemon) {
 		pid_t pid;
 		pid = fork();
 		if (pid < 0) {
-			perror("fork failed");
+			perror("Failed to fork\n");
 			exit(EXIT_FAILURE);
 		}
 		if (pid > 0) {
@@ -275,18 +439,54 @@ int main(int argc, char **argv)
 	//初始化event API
     event_init();
 
+	//判断是否设置了-s，以socket运行
+	if (event_option_socket) {
+		int socketlisten;
+		struct sockaddr_in addresslisten;
+		struct event accept_event;
+		int reuse = 1;
+
+		socketlisten = socket(AF_INET, SOCK_STREAM, 0);
+		if (socketlisten < 0) {
+			fprintf(stderr, "Failed to create listen socket\n");
+			exit(1);
+		}
+
+		memset(&addresslisten, 0, sizeof(addresslisten));
+		addresslisten.sin_family = AF_INET;
+		addresslisten.sin_addr.s_addr = inet_addr(event_option_listen);
+		addresslisten.sin_port = htons(event_option_port);
+		if (bind(socketlisten, (struct sockaddr *)&addresslisten, sizeof(addresslisten)) < 0) {
+			fprintf(stderr, "Failed to bind socket %s:%d\n", event_option_listen, event_option_port);
+			exit(1);
+		}
+
+		if (listen(socketlisten, 5) < 0) {
+			fprintf(stderr, "Failed to listen to socket\n");
+			exit(1);
+		}
+		setsockopt(socketlisten, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+		set_nonblock(socketlisten);
+
+		event_set(&accept_event, socketlisten, EV_READ|EV_PERSIST, on_accept, NULL);
+		event_add(&accept_event, NULL);
+		event_dispatch();
+
+		close(socketlisten);
+		return 0;
+	}
+
     // 绑定IP和端口
     struct evhttp *httpd;
-	httpd = evhttp_start(httpd_option_listen, httpd_option_port);
+	httpd = evhttp_start(event_option_listen, event_option_port);
 
-    if (httpd == NULL)
-    {
-        fprintf(stderr, "Error: Unable to listen on %s:%d\n", httpd_option_listen, httpd_option_port);
+    if (httpd == NULL) {
+        fprintf(stderr, "Failed to listen on %s:%d\n", event_option_listen, event_option_port);
         exit(1);
     }
 
     // 设置请求超时时间
-    evhttp_set_timeout(httpd, httpd_option_timeout);
+    evhttp_set_timeout(httpd, event_option_timeout);
 
     // 设置请求的处理函数
     evhttp_set_gencb(httpd, http_handler, NULL);
