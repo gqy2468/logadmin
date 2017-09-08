@@ -1,16 +1,19 @@
 /*
  * Util for logadmin.
  */
-#include "logadmin.h"
+#include "util.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+  
+#include <fcntl.h>
 
 /** 
  * mime_type - get mime type header 
  * 
  */  
-void mime_type(char *name, char *ret)
+char * mime_type(char *name)
 {  
     char *dot, *buf;
   
@@ -41,8 +44,9 @@ void mime_type(char *name, char *ret)
         buf = "image/jpeg";
     } else {  
         buf = "application/octet-stream";
-    }  
-    strcpy(ret, buf);
+    }
+	
+	return buf;
 }
 
 /** 
@@ -76,55 +80,128 @@ void show_version() {
  * exec_cmd - execute shell command 
  * 
  */ 
-int exec_cmd(char *cmd, char *buf, int len) {
-	if(!cmd || !strlen(cmd)){
-        return -1;
-    }
-    if (len <= 0) {
-        len = 2048;
-	}
-	memset(buf, 0, len);
+char * exec_cmd(char *cmd) {
+    int len = 1024;
+	char *str = malloc(len + 1);//注意多一位给\0使用
+	char *buf = malloc(len + 1);
+	strcpy(buf, "");
+	if(!cmd || !strlen(cmd)) return buf;
     FILE *pp = popen(cmd, "r"); //建立管道
     if (!pp) {
-        return -1;
-    } 
-	fread(buf, sizeof(char), len, pp);
+		fprintf(stderr, "execute command error: “%s”\n", cmd);
+        return buf;
+    }
+	while (!feof(pp)) {
+		memset(str, 0, len + 1);
+		fread(str, sizeof(char), len, pp);
+		fseek(pp, strlen(str), SEEK_CUR);
+		if (strlen(buf) > 0) {
+			buf = (char *)realloc(buf, strlen(buf) + strlen(str) + 1);
+			strcat(buf, str);
+		} else {
+			strcpy(buf, str);
+		}
+	}
     pclose(pp); //关闭管道
-    return 1;
+	free(str);
+    return buf;
 }
 
 /** 
- * read_log - read log file by line
+ * read_log - read log file
  * 
  */ 
-int read_log(char *log, char *buf, int page, int len) {
-	if(!log || !strlen(log)) {
-        return -1;
+char * read_log(char *path) {
+	if(!path || !strlen(path)) return "";
+    int fd = open(path, O_RDONLY);
+    if (!fd) {
+		fprintf(stderr, "read log error: %s\n", path);
+        return "";
     }
-    if (page <= 0) {
-        page = 1;
+	int size = file_size(path);
+	char *buf = malloc(size + 1);
+    read(fd, buf, size);
+	buf[size] = '\0';
+    close(fd);
+    return buf;
+}
+
+/** 
+ * joinstr - join string
+ * 
+ */ 
+char * joinstr(char *str, ...) {
+	if (str == NULL) return str;
+    int key = 0;
+    int len = strlen(str) + 1;
+	char *p, *sval;
+	int ival;
+	double dval;
+    char *res = malloc(len);
+    char *s = malloc(len);
+	strcpy(res, "");
+    va_list args;
+    va_start(args, str);
+	for (p = str; *p; p++) {
+		if(*p != '%') {
+			s[key++] = *p;
+			continue;
+		}
+		switch(*++p) {
+			case '%':
+				s[key] = '%';
+				s[key+1] = '\0';
+				strcat(res, s);
+				key = 0;
+				break;
+			case 'd':
+				if (key > 0) {
+					s[key] = '\0';
+					strcat(res, s);
+					key = 0;
+				}
+				ival = va_arg(args, int);
+				char *isval = malloc(10);
+				sprintf(isval, "%d", ival); 
+				len = len - 2 + strlen(isval);
+				res = (char *)realloc(res, len);
+				strcat(res, isval);
+				free(isval);
+				break;
+			case 'f':
+				if (key > 0) {
+					s[key] = '\0';
+					strcat(res, s);
+					key = 0;
+				}
+				dval = va_arg(args, double);
+				char *dsval = malloc(50);
+				sprintf(dsval, "%f", dval); 
+				len = len - 2 + strlen(dsval);
+				res = (char *)realloc(res, len);
+				strcat(res, dsval);
+				free(dsval);
+				break;
+			case 's':
+				if (key > 0) {
+					s[key] = '\0';
+					strcat(res, s);
+					key = 0;
+				}
+				sval = va_arg(args, char *);
+				len = len - 2 + strlen(sval);
+				res = (char *)realloc(res, len);
+				strcat(res, sval);
+				break;
+			default:;
+		}
 	}
-    if (len <= 0) {
-        len = 2048;
+	if (key != 0) {
+		s[key] = '\0';
+		strcat(res, s);
+		key = 0;
 	}
-	memset(buf, 0, sizeof(buf)); 
-    FILE *fp = fopen(log, "r");
-	if(fp == NULL) {
-        return -1;
-	}
-	char lines[2048];
-	int line = 0;
-	while(!feof(fp)) {
-		line++;
-		memset(lines, 0, sizeof(lines)); 
-		if(!fgets(lines, len, fp)) break;
-		if(line <= (page - 1) * 20) continue;
-		if(line > page * 20) continue;
-		strcat(buf, lines);
-	}
-	char *newbuf = strdup(buf);
-	sprintf(buf, "%d\n%s", line, newbuf);
-	free(newbuf);
-    fclose(fp);
-    return 1;
+	va_end(args);
+	free(s);
+    return res;  
 }

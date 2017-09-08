@@ -1,8 +1,9 @@
 /*
  * Util header for logadmin.
  */
-void mime_type(const char *name, char *ret);
+char * mime_type(char *name);
 void show_help();
 void show_version();
-int exec_cmd(char *cmd, char *buf, int len);
-int read_log(char *log, char *buf, int page, int len);
+char * exec_cmd(char *cmd);
+char * read_log(char *path);
+char * joinstr(char *str, ...);

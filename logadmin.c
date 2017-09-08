@@ -12,6 +12,7 @@
  *      Flash Guo <admin@rschome.com>
  */
 #include "logadmin.h"
+#include "util.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,15 +36,13 @@
 #include <event.h>
 #include <evhttp.h>
 
-static char dir_root[20000];
-
 struct http_req  
 {
     char method[20];
     char request_uri[500];
     char http_version[100];
     char client_ip[20];
-    char request_time[2000];
+    char request_time[20];
 } http_req_line;
 
 struct sock_ev {
@@ -160,11 +159,6 @@ void signal_handler(int sig)
  */ 
 void http_handler(struct evhttp_request *req, void *arg)
 {
-    char buff[20000];
-    char real_path[20000];
-    char tmp[200000];
-    char content_type[2000];
-  
     time_t timep;
     struct tm *m;
     struct stat info;
@@ -197,6 +191,7 @@ void http_handler(struct evhttp_request *req, void *arg)
   
     // 处理不同的ACTION
 	if (action) {
+		char *tmp = "";
 		evhttp_add_header(req->output_headers, "Content-Type", "text/html; charset=UTF-8");
 		if (strcmp(action, "loginfo") == 0) {
 			char *loghost = (char*)evhttp_find_header(&params, "loghost");
@@ -205,18 +200,15 @@ void http_handler(struct evhttp_request *req, void *arg)
 			char *pagenum = (char*)evhttp_find_header(&params, "pagenum");
 			int pnum = pagenum ? atoi(pagenum) : 1;
 			int port = logport ? atoi(logport) : 8706;
-			memset(&tmp, 0, sizeof(tmp));
 			if (logname) {
-				char cmd[2000];
 				int psize = 20;
 				char *logreg = (char*)evhttp_find_header(&params, "logreg");
 				if(!logreg || !strlen(logreg)){
 					logreg = ".*";
 				}
-				memset(&cmd, 0, sizeof(cmd));
-				sprintf(cmd, "grep '%s' %s -c && grep '%s' %s | tail -n +%d | head -n %d", logreg, logname, logreg, logname, (pnum - 1) * psize, psize);
+				char *cmd = joinstr("grep '%s' %s -c && grep '%s' %s | tail -n +%d | head -n %d", logreg, logname, logreg, logname, (pnum - 1) * psize, psize);
 				if (!loghost || !strlen(loghost)) {
-					exec_cmd(cmd, &tmp, MEM_SIZE);
+					tmp = exec_cmd(cmd);
 				} else {
 					sock_cmd(loghost, port, cmd, (char*)&tmp, MEM_SIZE);
 				}
@@ -228,13 +220,10 @@ void http_handler(struct evhttp_request *req, void *arg)
 			char *logport = (char*)evhttp_find_header(&params, "logport");
 			char *dirname = (char*)evhttp_find_header(&params, "dirname");
 			int port = logport ? atoi(logport) : 8706;
-			memset(&tmp, 0, sizeof(tmp));
 			if (dirname) {
-				char cmd[2000];
-				memset(&cmd, 0, sizeof(cmd));
-				sprintf(cmd, "ls -lF %s | awk '{print $9}'", dirname);
+				char *cmd = joinstr("ls -lF %s | awk '{print $9}'", dirname);
 				if (!loghost || !strlen(loghost)) {
-					exec_cmd(cmd, &tmp, MEM_SIZE);
+					tmp = exec_cmd(cmd);
 				} else {
 					sock_cmd(loghost, port, cmd, (char*)&tmp, MEM_SIZE);
 				}
@@ -242,28 +231,18 @@ void http_handler(struct evhttp_request *req, void *arg)
 			evbuffer_add_printf(buf, "%s", tmp);
 			evhttp_send_reply(req, HTTP_OK, "OK", buf);
 		} else if(strcmp(action, "logconf") == 0) {
-			memset(&tmp, 0, sizeof(tmp));
 			GKeyFile* config = g_key_file_new();
 			GKeyFileFlags flags = G_KEY_FILE_KEEP_COMMENTS | G_KEY_FILE_KEEP_TRANSLATIONS;
 			if (g_key_file_load_from_file(config, "./conf/logadmin.conf", flags, NULL)) {
 				int i;
-				gchar* host;
-				gchar* path;
-				gchar* port;
 				gsize length;
-				char conf[20000];
 				gchar** groups = g_key_file_get_groups(config, &length);
 				for (i = 0; i < (int)length; i++) {
-					host = g_key_file_get_string(config, groups[i], "host", NULL);
-					path = g_key_file_get_string(config, groups[i], "path", NULL);
-					port = g_key_file_get_string(config, groups[i], "port", NULL);
-					if(!port || !strlen(port)){
-						port = "8706";
-					}
-					if (host && path) {
-						strcpy(conf, tmp);
-						sprintf(tmp, "%s%s:%s;%s\n", conf, host, port, path);
-					}
+					gchar* host = g_key_file_get_string(config, groups[i], "host", NULL);
+					gchar* path = g_key_file_get_string(config, groups[i], "path", NULL);
+					gchar* port = g_key_file_get_string(config, groups[i], "port", NULL);
+					if(!port || !strlen(port)) port = "8706";
+					if (host && path) tmp = joinstr("%s%s:%s;%s\n", tmp, host, port, path);
 				}
 			}
 			g_key_file_free(config);
@@ -278,9 +257,8 @@ void http_handler(struct evhttp_request *req, void *arg)
 	}
   
     // 获取请求的服务器文件路径
-    memset(&real_path, 0, sizeof(real_path));
-	getcwd(dir_root, sizeof(dir_root));
-    sprintf(real_path, "%s/%s%s", dir_root, DOCUMENT_ROOT, http_req_line.request_uri);
+    char *dir_root = getcwd(NULL, 0);
+    char *real_path = joinstr("%s/%s%s", dir_root, DOCUMENT_ROOT, http_req_line.request_uri);
 
     if (stat(real_path,&info) == -1) {
         evhttp_add_header(req->output_headers, "Content-Type", "text/html; charset=UTF-8");
@@ -300,22 +278,15 @@ void http_handler(struct evhttp_request *req, void *arg)
 			evhttp_send_reply(req, 500, "Server Error", buf);
         }
     } else if(S_ISREG(info.st_mode)) {
-        memset(&tmp, 0, sizeof(tmp));
-        int fd = open(real_path, O_RDONLY);
-        read(fd, tmp, file_size(real_path));
-        close(fd);
-  
         // 设置HEADER头并输出内容到浏览器
-        memset(&buff, 0, sizeof(buff));
-        mime_type(real_path, content_type);
-        sprintf(buff, "%s; charset=UTF-8", content_type);
-        evhttp_add_header(req->output_headers, "Content-Type", buff);
-        evbuffer_add_printf(buf, "%s", tmp);
+        evhttp_add_header(req->output_headers, "Content-Type", joinstr("%s; charset=UTF-8", mime_type(real_path)));
+        evbuffer_add_printf(buf, "%s", read_log(real_path));
         evhttp_send_reply(req, HTTP_OK, "OK", buf);
     }
 
     // 内存释放
     evbuffer_free(buf);
+    free(dir_root);
 }
 
 /** 
@@ -355,10 +326,8 @@ void on_read(int sock, short event, void* arg)
         close(sock);
         return;
     }
-	char cmd[2000];
-	sprintf(cmd, "%s", ev->buffer);
-	exec_cmd(cmd, ev->buffer, MEM_SIZE);
-    event_set(ev->write_ev, sock, EV_WRITE, on_write, ev->buffer);
+	char *cmd = joinstr("%s", ev->buffer);
+    event_set(ev->write_ev, sock, EV_WRITE, on_write, exec_cmd(cmd));
     event_add(ev->write_ev, NULL);
 }
 
