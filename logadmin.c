@@ -12,26 +12,36 @@
  *      Flash Guo <admin@rschome.com>
  */
 #include "logadmin.h"
+#include "global.h"
 #include "util.h"
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <error.h>
 #include <errno.h>
 
-#include <sys/queue.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <dirent.h>  
-#include <unistd.h>  
+#include <dirent.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <time.h>
 #include <signal.h>
 
-#include <glib.h>
+#ifdef __WIN32
+	#include <WinSock2.h>
+#else
+	#include <sys/queue.h>
+	#include <sys/types.h>
+	#include <sys/socket.h>
+	#include <unistd.h>
+	#include <arpa/inet.h>
+	#include <netinet/in.h>
+	#include <netinet/tcp.h>
+	#include <netdb.h>
+
+	#include <glib.h>
+#endif
 
 #include <event.h>
 #include <evhttp.h>
@@ -41,7 +51,7 @@ struct http_req
     char method[20];
     char request_uri[500];
     char http_version[100];
-    char client_ip[20];
+    char client_ip[25];
     char request_time[20];
 } http_req_line;
 
@@ -56,11 +66,13 @@ struct sock_ev {
  */
 int set_nonblock(int fd)
 {
-  int flags;
-
-  flags = fcntl(fd, F_GETFL);
-  flags |= O_NONBLOCK;
-  fcntl(fd, F_SETFL, flags);
+#ifdef __WIN32
+	unsigned long on_windows = 1;
+	return ioctlsocket(fd, FIONBIO, &on_windows);
+#else
+	char *on = 1;
+	return ioctlsocket(fd, FIONBIO, (char *)&on);
+#endif
 }
 
 /** 
@@ -95,6 +107,12 @@ void sock_cmd(char *host, int port, char *cmd, char *buf, int len)
 	}
 
     // create socket
+#ifdef __WIN32
+	unsigned short ver;
+	WSADATA wsaData;
+	ver = MAKEWORD(1, 1);
+	WSAStartup(ver, &wsaData);
+#endif
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd < 0) {
 		fprintf(stderr, "Failed to create socket\n");
@@ -127,7 +145,11 @@ void sock_cmd(char *host, int port, char *cmd, char *buf, int len)
 	memset(buf, 0, len);
 	while (1) {
 		if (recv(fd, buf, len, 0) < 0) {
+#ifdef __WIN32
+			if (errno == EAGAIN || errno == EINTR) continue;//继续接收数据
+#else
 			if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) continue;//继续接收数据
+#endif
 			fprintf(stderr, "Failed to read socket\n");
 			break;//跳出接收循环
 		} else {
@@ -136,6 +158,9 @@ void sock_cmd(char *host, int port, char *cmd, char *buf, int len)
 	}
 
     close(fd);
+#ifdef __WIN32
+	WSACleanup();
+#endif
 }
 
 /** 
@@ -144,9 +169,11 @@ void sock_cmd(char *host, int port, char *cmd, char *buf, int len)
 void signal_handler(int sig)
 {
 	switch (sig) {
-		case SIGTERM:
+#ifndef __WIN32
 		case SIGHUP:
 		case SIGQUIT:
+#endif
+		case SIGTERM:
 		case SIGINT:
 			//终止侦听event_dispatch()的事件侦听循环，执行之后的代码
 			event_loopbreak();
@@ -162,9 +189,6 @@ void http_handler(struct evhttp_request *req, void *arg)
     time_t timep;
     struct tm *m;
     struct stat info;
-      
-    DIR *dir;
-    struct dirent *ptr;
   
     struct evbuffer *buf;
     buf = evbuffer_new();
@@ -231,6 +255,7 @@ void http_handler(struct evhttp_request *req, void *arg)
 			evbuffer_add_printf(buf, "%s", tmp);
 			evhttp_send_reply(req, HTTP_OK, "OK", buf);
 		} else if(strcmp(action, "logconf") == 0) {
+#ifndef __WIN32
 			GKeyFile* config = g_key_file_new();
 			GKeyFileFlags flags = G_KEY_FILE_KEEP_COMMENTS | G_KEY_FILE_KEEP_TRANSLATIONS;
 			if (g_key_file_load_from_file(config, "./conf/logadmin.conf", flags, NULL)) {
@@ -246,6 +271,7 @@ void http_handler(struct evhttp_request *req, void *arg)
 				}
 			}
 			g_key_file_free(config);
+#endif
 			evbuffer_add_printf(buf, "%s", tmp);
 			evhttp_send_reply(req, HTTP_OK, "OK", buf);
 		} else {
@@ -317,10 +343,9 @@ void on_write(int sock, short event, void* arg)
  */ 
 void on_read(int sock, short event, void* arg)
 {
-    struct event* write_ev;
     struct sock_ev* ev = (struct sock_ev*)arg;
     ev->buffer = (char*)malloc(MEM_SIZE);
-    bzero(ev->buffer, MEM_SIZE);
+    memset(ev->buffer, 0, sizeof(char));
     if (recv(sock, ev->buffer, MEM_SIZE, 0) <= 0) {
         free_sock(ev);
         close(sock);
@@ -350,10 +375,12 @@ void on_accept(int sock, short event, void* arg)
 int main(int argc, char **argv)
 {
 	//自定义信号处理函数
+#ifndef __WIN32
 	signal(SIGHUP, signal_handler);
+	signal(SIGQUIT, signal_handler);
+#endif
 	signal(SIGTERM, signal_handler);
 	signal(SIGINT, signal_handler);
-	signal(SIGQUIT, signal_handler);
 
 	//默认参数
 	char *event_option_listen = "127.0.0.1";
@@ -393,8 +420,10 @@ int main(int argc, char **argv)
 
 	//判断是否设置了-d，以daemon运行
 	if (event_option_daemon) {
-		pid_t pid;
+		pid_t pid = 0;
+#ifndef __WIN32
 		pid = fork();
+#endif
 		if (pid < 0) {
 			perror("Failed to fork\n");
 			exit(EXIT_FAILURE);
@@ -413,8 +442,13 @@ int main(int argc, char **argv)
 		int socketlisten;
 		struct sockaddr_in addresslisten;
 		struct event accept_event;
-		int reuse = 1;
 
+#ifdef __WIN32
+		unsigned short ver;
+		WSADATA wsaData;
+		ver = MAKEWORD(1, 1);
+		WSAStartup(ver, &wsaData);
+#endif
 		socketlisten = socket(AF_INET, SOCK_STREAM, 0);
 		if (socketlisten < 0) {
 			fprintf(stderr, "Failed to create listen socket\n");
@@ -434,6 +468,11 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Failed to listen to socket\n");
 			exit(1);
 		}
+#ifdef __WIN32
+		char reuse = 1;
+#else
+		int reuse = 1;
+#endif
 		setsockopt(socketlisten, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 		set_nonblock(socketlisten);
 
@@ -442,10 +481,19 @@ int main(int argc, char **argv)
 		event_dispatch();
 
 		close(socketlisten);
+#ifdef __WIN32
+		WSACleanup();
+#endif
 		return 0;
 	}
 
     // 绑定IP和端口
+#ifdef __WIN32
+	unsigned short ver;
+	WSADATA wsaData;
+	ver = MAKEWORD(1, 1);
+	WSAStartup(ver, &wsaData);
+#endif
     struct evhttp *httpd;
 	httpd = evhttp_start(event_option_listen, event_option_port);
 
@@ -461,6 +509,9 @@ int main(int argc, char **argv)
     evhttp_set_gencb(httpd, http_handler, NULL);
     event_dispatch();
     evhttp_free(httpd);
+#ifdef __WIN32
+	WSACleanup();
+#endif
 
     return 0;
 }
